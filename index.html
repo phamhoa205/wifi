@@ -1,14 +1,217 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>pass Wifi</title>
-	<link rel="stylesheet" href="pass-wifi.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mã QR Wi-Fi</title>
+  <style>
+    /* body */
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      background: #fafafa;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #222;
+    }
+
+    /* container */
+    .card {
+      max-width: 420px;
+      width: 90%;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      padding: 18px;
+      text-align: center;
+    }
+
+    img.qr {
+      width: 260px;
+      height: auto;
+      display: block;
+      margin: 0 auto 12px;
+      border-radius: 8px;
+    }
+
+    h1 { margin: 6px 0 2px; font-size: 20px; }
+    p.desc { margin: 0 0 14px; color: #555; }
+
+    /* toast (ở trên cùng) */
+    .toast {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: rgba(0,0,0,0.88);
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 10px;
+      min-width: 260px;
+      text-align: left;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 240ms ease, opacity 240ms ease;
+      z-index: 9999;
+    }
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+    .toast strong { display:block; font-size:16px; margin-bottom:6px; }
+    .toast small { display:block; font-size:13px; color: rgba(255,255,255,0.9); }
+
+    /* nút */
+    .btn {
+      display:inline-block;
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      text-decoration: none;
+      cursor: pointer;
+      font-size: 14px;
+      border: none;
+    }
+    .btn.secondary { background: #6c757d; }
+
+    /* ẩn nội dung “caption” nếu không cần hiển thị trong page body */
+    .caption-hidden { display:none; }
+  </style>
 </head>
 <body>
-	<div class="meme">
-		<img src="passwifi.jpg">
-	</div>
+  <div class="card" role="main">
+    <!-- bạn có thể thay bằng ảnh QR thực tế hoặc đường link ảnh -->
+    <img src="passwifi.jpg" alt="QR" class="qr">
+    <h1>Mã QR Wi-Fi</h1>
+    <p class="desc">Quét mã này để kết nối mạng</p>
+
+    <!-- Nút để bật notification hệ thống (nếu bạn muốn) -->
+    <button id="request-perm" class="btn">Bật thông báo hệ thống</button>
+    <button id="toggle-toast" class="btn secondary">Hiện/Ẩn thông báo giả</button>
+
+    <!-- Thẻ chứa nội dung thông báo (có thể ẩn, cũng dùng để lấy text) -->
+    <div id="caption" class="caption-hidden">
+      <h3>Mã QR Wi-Fi</h3>
+      <p>Kết nối mạng "<strong>iphone 17 Promax</strong>"</p>
+    </div>
+  </div>
+
+  <!-- toast trên cùng -->
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">
+    <strong id="toast-title"></strong>
+    <small id="toast-text"></small>
+  </div>
+
+<script>
+  // Khi trang load: tự hiện toast (hoặc bạn có thể cho user click)
+  document.addEventListener('DOMContentLoaded', () => {
+    const toast = document.getElementById('toast');
+    const titleEl = document.getElementById('toast-title');
+    const textEl = document.getElementById('toast-text');
+    const caption = document.getElementById('caption');
+    const btnPerm = document.getElementById('request-perm');
+    const btnToggle = document.getElementById('toggle-toast');
+
+    // Lấy nội dung từ caption
+    function getCaptionText() {
+      const t = caption.querySelector('h3')?.textContent.trim() || 'Thông báo';
+      const p = caption.querySelector('p')?.textContent.trim() || '';
+      return { t, p };
+    }
+
+    // escape simple
+    function escapeHtml(s = '') {
+      return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    // show/hide toast (click để toggle)
+    function showToast(autoHide = false, duration = 4000) {
+      const { t, p } = getCaptionText();
+      titleEl.innerHTML = escapeHtml(t);
+      textEl.innerHTML = escapeHtml(p);
+      toast.classList.add('visible');
+
+      if (autoHide) {
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => {
+          toast.classList.remove('visible');
+        }, duration);
+      }
+    }
+    function hideToast() {
+      toast.classList.remove('visible');
+    }
+    function toggleToast() {
+      if (toast.classList.contains('visible')) hideToast();
+      else showToast(true, 5000);
+    }
+
+    // Mặc định: tự hiện toast khi mở trang (bạn muốn tắt thì comment dòng dưới)
+    showToast(true, 4500);
+
+    // click nút toggle
+    btnToggle.addEventListener('click', toggleToast);
+
+    // Nút yêu cầu quyền Notification hệ thống
+    btnPerm.addEventListener('click', async () => {
+      if (!('Notification' in window)) {
+        alert('Trình duyệt không hỗ trợ Notification.');
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        alert('Đã được cấp phép. Sẽ thử hiển thị Notification.');
+        sendNative();
+        return;
+      }
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          alert('Bạn đã cho phép Notification. Giờ sẽ hiển thị.');
+          sendNative();
+        } else {
+          alert('Bạn đã từ chối hoặc chưa cho phép Notification.');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    });
+
+    // Hàm gửi native notification (chỉ hoạt động trên HTTPS hoặc localhost)
+    function sendNative() {
+      const { t, p } = getCaptionText();
+      try {
+        const n = new Notification(t || 'Thông báo', {
+          body: p || '',
+          icon: '', // bạn có thể để url icon ở đây
+        });
+        n.onclick = () => {
+          window.focus();
+          n.close();
+        };
+      } catch (err) {
+        console.error('Không thể hiển thị Notification:', err);
+      }
+    }
+
+    // Nếu bạn muốn khi mở trang tự hỏi permission -> bật, hãy bật đoạn sau (cẩn trọng)
+    // if (Notification && Notification.permission === 'default') Notification.requestPermission();
+
+    // Phím Esc ẩn toast
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') hideToast();
+    });
+
+    // Click bất kỳ ngoài toast sẽ ẩn nó
+    document.addEventListener('click', (e) => {
+      if (!toast.contains(e.target) && !e.target.closest('.btn')) hideToast();
+    });
+  });
+</script>
 </body>
 </html>
